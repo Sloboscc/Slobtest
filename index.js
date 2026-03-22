@@ -359,6 +359,7 @@ app.get('/logs', (req, res) => {
 <html>
   <head>
     <title>${config.name} - Setup Guide</title>
+    <meta http-equiv="refresh" content="2">
     <style>
       body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #cbd5e1; padding: 40px; max-width: 800px; margin: 0 auto; line-height: 1.6; }
       h1, h2 { color: #2dd4bf; }
