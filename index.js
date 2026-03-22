@@ -1,5 +1,6 @@
 'use strict';
 
+const { addLog, getLogs } = require('./logger');
 const mineflayer = require('mineflayer');
 const { Movements, pathfinder, goals } = require('mineflayer-pathfinder');
 const { GoalBlock } = goals;
@@ -205,6 +206,7 @@ app.get('/', (req, res) => {
           </div>
 
           <a href="/tutorial" class="btn">📘 View Setup Guide</a>
+          <a href="/logs">📜 View Logs</a>
           
           <div class="footer">Auto-refreshing every 5s</div>
         </div>
@@ -317,17 +319,53 @@ app.get('/health', (req, res) => {
 
 app.get('/ping', (req, res) => res.send('pong'));
 
+app.get('/logs', (req, res) => {
+  const logs = getLogs();
+
+  res.send(`
+    <html>
+      <head>
+        <title>Bot Logs</title>
+        <meta http-equiv="refresh" content="2">
+        <style>
+          body {
+            background: #0f172a;
+            color: white;
+            font-family: Arial;
+            padding: 20px;
+          }
+          .log {
+            font-family: monospace;
+            margin-bottom: 5px;
+          }
+          a {
+            color: #3b82f6;
+          }
+        </style>
+      </head>
+      <body>
+        <h2>📜 Bot Logs</h2>
+        <a href="/">⬅ Back</a>
+        <hr>
+        ${logs.map(l => `<div class="log">${l}</div>`).join("")}
+      </body>
+    </html>
+  `);
+});
+
+
+
 // FIX: handle port conflict gracefully - try next port if taken
 const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Server] HTTP server started on port ${server.address().port} `);
+  addlog(`[Server] HTTP server started on port ${server.address().port} `);
 });
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     const fallbackPort = PORT + 1;
-    console.log(`[Server] Port ${PORT} in use - trying port ${fallbackPort} `);
+    addlog(`[Server] Port ${PORT} in use - trying port ${fallbackPort} `);
     server.listen(fallbackPort, '0.0.0.0');
   } else {
-    console.log(`[Server] HTTP server error: ${err.message} `);
+    addlog(`[Server] HTTP server error: ${err.message} `);
   }
 });
 
@@ -348,7 +386,7 @@ const SELF_PING_INTERVAL = 10 * 60 * 1000;
 function startSelfPing() {
   const renderUrl = process.env.RENDER_EXTERNAL_URL;
   if (!renderUrl) {
-    console.log('[KeepAlive] No RENDER_EXTERNAL_URL set - self-ping disabled (running locally)');
+    addlog('[KeepAlive] No RENDER_EXTERNAL_URL set - self-ping disabled (running locally)');
     return;
   }
   setInterval(() => {
@@ -356,10 +394,10 @@ function startSelfPing() {
     protocol.get(`${renderUrl}/ping`, (res) => {
       // Silent success
     }).on('error', (err) => {
-      console.log(`[KeepAlive] Self-ping failed: ${err.message}`);
+      addlog(`[KeepAlive] Self-ping failed: ${err.message}`);
     });
   }, SELF_PING_INTERVAL);
-  console.log('[KeepAlive] Self-ping system started (every 10 min)');
+  addlog('[KeepAlive] Self-ping system started (every 10 min)');
 }
 
 startSelfPing();
@@ -370,7 +408,7 @@ startSelfPing();
 setInterval(() => {
   const mem = process.memoryUsage();
   const heapMB = (mem.heapUsed / 1024 / 1024).toFixed(2);
-  console.log(`[Memory] Heap: ${heapMB} MB`);
+  addlog(`[Memory] Heap: ${heapMB} MB`);
 }, 5 * 60 * 1000);
 
 // ============================================================
@@ -401,7 +439,7 @@ let lastDiscordSend = 0;
 const DISCORD_RATE_LIMIT_MS = 5000; // min 5s between webhook calls
 
 function clearAllIntervals() {
-  console.log(`[Cleanup] Clearing ${activeIntervals.length} intervals`);
+  addlog(`[Cleanup] Clearing ${activeIntervals.length} intervals`);
   activeIntervals.forEach(id => clearInterval(id));
   activeIntervals = [];
 }
@@ -416,7 +454,7 @@ function getReconnectDelay() {
   if (botState.wasThrottled) {
     botState.wasThrottled = false;
     const throttleDelay = 60000 + Math.floor(Math.random() * 60000);
-    console.log(`[Bot] Throttle detected - using extended delay: ${throttleDelay / 1000}s`);
+    addlog(`[Bot] Throttle detected - using extended delay: ${throttleDelay / 1000}s`);
     return throttleDelay;
   }
 
@@ -430,7 +468,7 @@ function getReconnectDelay() {
 
 function createBot() {
   if (isReconnecting) {
-    console.log('[Bot] Already reconnecting, skipping...');
+    addlog('[Bot] Already reconnecting, skipping...');
     return;
   }
 
@@ -441,13 +479,13 @@ function createBot() {
       bot.removeAllListeners();
       bot.end();
     } catch (e) {
-      console.log('[Cleanup] Error ending previous bot:', e.message);
+      addlog('[Cleanup] Error ending previous bot:', e.message);
     }
     bot = null;
   }
 
-  console.log(`[Bot] Creating bot instance...`);
-  console.log(`[Bot] Connecting to ${config.server.ip}:${config.server.port}`);
+  addlog(`[Bot] Creating bot instance...`);
+  addlog(`[Bot] Connecting to ${config.server.ip}:${config.server.port}`);
 
   try {
     // FIX: use version:false to auto-detect server version so the bot can join any server.
@@ -470,7 +508,7 @@ function createBot() {
     clearBotTimeouts();
     connectionTimeoutId = setTimeout(() => {
       if (!botState.connected) {
-        console.log('[Bot] Connection timeout - no spawn received');
+        addlog('[Bot] Connection timeout - no spawn received');
         try {
           bot.removeAllListeners();
           bot.end();
@@ -493,7 +531,7 @@ function createBot() {
       botState.reconnectAttempts = 0;
       isReconnecting = false;
 
-      console.log(`[Bot] [+] Successfully spawned on server! (Version: ${bot.version})`);
+      addlog(`[Bot] [+] Successfully spawned on server! (Version: ${bot.version})`);
       if (config.discord && config.discord.events && config.discord.events.connect) {
         sendDiscordWebhook(`[+] **Connected** to \`${config.server.ip}\``, 0x4ade80);
       }
@@ -512,7 +550,7 @@ function createBot() {
       setTimeout(() => {
         if (bot && botState.connected && config.server['try-creative']) {
           bot.chat('/gamemode creative');
-          console.log('[INFO] Attempted to set creative mode (requires OP)');
+          addlog('[INFO] Attempted to set creative mode (requires OP)');
         }
       }, 3000);
 
@@ -521,7 +559,7 @@ function createBot() {
           message.includes('commands.gamemode.success.self') ||
           message.includes('Set own game mode to Creative Mode')
         ) {
-          console.log('[INFO] Bot is now in Creative Mode.');
+          addlog('[INFO] Bot is now in Creative Mode.');
         }
       });
     });
@@ -531,14 +569,14 @@ function createBot() {
     bot.on('kicked', (reason) => {
       // FIX: stringify reason if it's an object to make it readable in logs
       const kickReason = typeof reason === 'object' ? JSON.stringify(reason) : reason;
-      console.log(`[Bot] Kicked: ${kickReason}`);
+      addlog(`[Bot] Kicked: ${kickReason}`);
       botState.connected = false;
       botState.errors.push({ type: 'kicked', reason: kickReason, time: Date.now() });
       clearAllIntervals();
 
       const reasonStr = String(kickReason).toLowerCase();
       if (reasonStr.includes('throttl') || reasonStr.includes('wait before reconnect') || reasonStr.includes('too fast')) {
-        console.log('[Bot] Throttle kick detected - will use extended reconnect delay');
+        addlog('[Bot] Throttle kick detected - will use extended reconnect delay');
         botState.wasThrottled = true;
       }
 
@@ -550,7 +588,7 @@ function createBot() {
 
     // FIX: 'end' is the single reconnect trigger
     bot.on('end', (reason) => {
-      console.log(`[Bot] Disconnected: ${reason || 'Unknown reason'}`);
+      addlog(`[Bot] Disconnected: ${reason || 'Unknown reason'}`);
       botState.connected = false;
       clearAllIntervals();
       spawnHandled = false; // reset for next connection
@@ -565,13 +603,13 @@ function createBot() {
 
     bot.on('error', (err) => {
       const msg = err.message || '';
-      console.log(`[Bot] Error: ${msg}`);
+      addlog(`[Bot] Error: ${msg}`);
       botState.errors.push({ type: 'error', message: msg, time: Date.now() });
       // Don't reconnect on error - let 'end' event handle it
     });
 
   } catch (err) {
-    console.log(`[Bot] Failed to create bot: ${err.message}`);
+    addlog(`[Bot] Failed to create bot: ${err.message}`);
     scheduleReconnect();
   }
 }
@@ -581,7 +619,7 @@ function scheduleReconnect() {
 
   // FIX: don't stack reconnect if already waiting
   if (isReconnecting) {
-    console.log('[Bot] Reconnect already scheduled, skipping duplicate.');
+    addlog('[Bot] Reconnect already scheduled, skipping duplicate.');
     return;
   }
 
@@ -589,7 +627,7 @@ function scheduleReconnect() {
   botState.reconnectAttempts++;
 
   const delay = getReconnectDelay();
-  console.log(`[Bot] Reconnecting in ${delay / 1000}s (attempt #${botState.reconnectAttempts})`);
+  addlog(`[Bot] Reconnecting in ${delay / 1000}s (attempt #${botState.reconnectAttempts})`);
 
   reconnectTimeoutId = setTimeout(() => {
     reconnectTimeoutId = null;
@@ -602,7 +640,7 @@ function scheduleReconnect() {
 // MODULE INITIALIZATION
 // ============================================================
 function initializeModules(bot, mcData, defaultMove) {
-  console.log('[Modules] Initializing all modules...');
+  addlog('[Modules] Initializing all modules...');
 
   // ---------- AUTO AUTH (REACTIVE) ----------
   if (config.utils['auto-auth'] && config.utils['auto-auth'].enabled) {
@@ -614,10 +652,10 @@ function initializeModules(bot, mcData, defaultMove) {
       authHandled = true;
       if (type === 'register') {
         bot.chat(`/register ${password} ${password}`);
-        console.log('[Auth] Detected register prompt - sent /register');
+        addlog('[Auth] Detected register prompt - sent /register');
       } else {
         bot.chat(`/login ${password}`);
-        console.log('[Auth] Detected login prompt - sent /login');
+        addlog('[Auth] Detected login prompt - sent /login');
       }
     };
 
@@ -634,7 +672,7 @@ function initializeModules(bot, mcData, defaultMove) {
     // Failsafe: if no prompt after 10s, try login anyway
     setTimeout(() => {
       if (!authHandled && bot && botState.connected) {
-        console.log('[Auth] No prompt detected after 10s, sending /login as failsafe');
+        addlog('[Auth] No prompt detected after 10s, sending /login as failsafe');
         bot.chat(`/login ${password}`);
         authHandled = true;
       }
@@ -665,7 +703,7 @@ function initializeModules(bot, mcData, defaultMove) {
   if (config.position && config.position.enabled && !(config.movement && config.movement['circle-walk'] && config.movement['circle-walk'].enabled)) {
     bot.pathfinder.setMovements(defaultMove);
     bot.pathfinder.setGoal(new GoalBlock(config.position.x, config.position.y, config.position.z));
-    console.log('[Position] Navigating to configured position...');
+    addlog('[Position] Navigating to configured position...');
   }
 
   // ---------- ANTI-AFK ----------
@@ -718,7 +756,7 @@ function initializeModules(bot, mcData, defaultMove) {
           }, 500 + Math.floor(Math.random() * 1500));
           botState.lastActivity = Date.now();
         } catch (e) {
-          console.log('[AntiAFK] Walk error:', e.message);
+          addlog('[AntiAFK] Walk error:', e.message);
         }
       }, 120000 + Math.floor(Math.random() * 360000));
     }
@@ -762,7 +800,7 @@ function initializeModules(bot, mcData, defaultMove) {
     chatModule(bot);
   }
 
-  console.log('[Modules] All modules initialized!');
+  addlog('[Modules] All modules initialized!');
 }
 
 // ============================================================
@@ -786,7 +824,7 @@ function startCircleWalk(bot, defaultMove) {
       angle += Math.PI / 4;
       botState.lastActivity = Date.now();
     } catch (e) {
-      console.log('[CircleWalk] Error:', e.message);
+      addlog('[CircleWalk] Error:', e.message);
     }
   }, config.movement['circle-walk'].speed);
 }
@@ -801,7 +839,7 @@ function startRandomJump(bot) {
       }, 300);
       botState.lastActivity = Date.now();
     } catch (e) {
-      console.log('[RandomJump] Error:', e.message);
+      addlog('[RandomJump] Error:', e.message);
     }
   }, config.movement['random-jump'].interval);
 }
@@ -815,7 +853,7 @@ function startLookAround(bot) {
       bot.look(yaw, pitch, false);
       botState.lastActivity = Date.now();
     } catch (e) {
-      console.log('[LookAround] Error:', e.message);
+      addlog('[LookAround] Error:', e.message);
     }
   }, config.movement['look-around'].interval);
 }
@@ -846,7 +884,7 @@ function avoidMobs(bot) {
         }
       }
     } catch (e) {
-      console.log('[AvoidMobs] Error:', e.message);
+      addlog('[AvoidMobs] Error:', e.message);
     }
   }, 2000);
 }
@@ -894,7 +932,7 @@ function combatModule(bot, mcData) {
         lastAttackTime = now;
       }
     } catch (e) {
-      console.log('[Combat] Error:', e.message);
+      addlog('[Combat] Error:', e.message);
     }
   });
 
@@ -907,11 +945,11 @@ function combatModule(bot, mcData) {
         if (food) {
           bot.equip(food, 'hand')
             .then(() => bot.consume())
-            .catch(e => console.log('[AutoEat] Error:', e.message));
+            .catch(e => addlog('[AutoEat] Error:', e.message));
         }
       }
     } catch (e) {
-      console.log('[AutoEat] Error:', e.message);
+      addlog('[AutoEat] Error:', e.message);
     }
   });
 }
@@ -940,7 +978,7 @@ function bedModule(bot, mcData) {
           isTryingToSleep = true;
           try {
             await bot.sleep(bedBlock);
-            console.log('[Bed] Sleeping...');
+            addlog('[Bed] Sleeping...');
           } catch (e) {
             // Can't sleep - maybe not night enough or monsters nearby
           } finally {
@@ -950,7 +988,7 @@ function bedModule(bot, mcData) {
       }
     } catch (e) {
       isTryingToSleep = false;
-      console.log('[Bed] Error:', e.message);
+      addlog('[Bed] Error:', e.message);
     }
   }, 10000);
 }
@@ -978,7 +1016,7 @@ function chatModule(bot) {
         }
       }
     } catch (e) {
-      console.log('[Chat] Error:', e.message);
+      addlog('[Chat] Error:', e.message);
     }
   });
 }
@@ -995,7 +1033,7 @@ const rl = readline.createInterface({
 
 rl.on('line', (line) => {
   if (!bot || !botState.connected) {
-    console.log('[Console] Bot not connected');
+    addlog('[Console] Bot not connected');
     return;
   }
 
@@ -1005,7 +1043,7 @@ rl.on('line', (line) => {
   } else if (trimmed.startsWith('cmd ')) {
     bot.chat('/' + trimmed.slice(4));
   } else if (trimmed === 'status') {
-    console.log(`Connected: ${botState.connected}, Uptime: ${formatUptime(Math.floor((Date.now() - botState.startTime) / 1000))}`);
+    addlog(`Connected: ${botState.connected}, Uptime: ${formatUptime(Math.floor((Date.now() - botState.startTime) / 1000))}`);
   } else {
     bot.chat(trimmed);
   }
@@ -1022,7 +1060,7 @@ function sendDiscordWebhook(content, color = 0x0099ff) {
   // FIX: Discord rate limiting - skip if sent too recently
   const now = Date.now();
   if (now - lastDiscordSend < DISCORD_RATE_LIMIT_MS) {
-    console.log('[Discord] Rate limited - skipping webhook');
+    addlog('[Discord] Rate limited - skipping webhook');
     return;
   }
   lastDiscordSend = now;
@@ -1057,7 +1095,7 @@ function sendDiscordWebhook(content, color = 0x0099ff) {
   });
 
   req.on('error', (e) => {
-    console.log(`[Discord] Error sending webhook: ${e.message}`);
+    addlog(`[Discord] Error sending webhook: ${e.message}`);
   });
 
   req.write(payload);
@@ -1070,7 +1108,7 @@ function sendDiscordWebhook(content, color = 0x0099ff) {
 // ============================================================
 process.on('uncaughtException', (err) => {
   const msg = err.message || 'Unknown';
-  console.log(`[FATAL] Uncaught Exception: ${msg}`);
+  addlog(`[FATAL] Uncaught Exception: ${msg}`);
   botState.errors.push({ type: 'uncaught', message: msg, time: Date.now() });
 
   // Cap errors array to prevent memory leak over long uptimes
@@ -1083,7 +1121,7 @@ process.on('uncaughtException', (err) => {
     msg.includes('write after end') || msg.includes('This socket has been ended');
 
   if (isNetworkError) {
-    console.log('[FATAL] Known network/protocol error - recovering gracefully...');
+    addlog('[FATAL] Known network/protocol error - recovering gracefully...');
   }
 
   // ALWAYS recover — bot must never stay disconnected
@@ -1092,7 +1130,7 @@ process.on('uncaughtException', (err) => {
 
   // FIX: reset isReconnecting if it was stuck, then schedule reconnect
   if (isReconnecting) {
-    console.log('[FATAL] isReconnecting was stuck - resetting before crash recovery');
+    addlog('[FATAL] isReconnecting was stuck - resetting before crash recovery');
     isReconnecting = false;
     // BUG FIX: was referencing non-existent 'reconnectTimeout' — correct name is 'reconnectTimeoutId'
     if (reconnectTimeoutId) {
@@ -1107,27 +1145,27 @@ process.on('uncaughtException', (err) => {
 });
 
 process.on('unhandledRejection', (reason) => {
-  console.log(`[FATAL] Unhandled Rejection: ${reason}`);
+  addlog(`[FATAL] Unhandled Rejection: ${reason}`);
   botState.errors.push({ type: 'rejection', message: String(reason), time: Date.now() });
 });
 
 process.on('SIGTERM', () => {
-  console.log('[System] SIGTERM received — ignoring, bot will stay alive.');
+  addlog('[System] SIGTERM received — ignoring, bot will stay alive.');
 });
 
 process.on('SIGINT', () => {
-  console.log('[System] SIGINT received — ignoring, bot will stay alive.');
+  addlog('[System] SIGINT received — ignoring, bot will stay alive.');
 });
 
 // ============================================================
 // START THE BOT
 // ============================================================
-console.log('='.repeat(50));
-console.log('  Minecraft AFK Bot v2.5 - Bug-Fixed Edition');
-console.log('='.repeat(50));
-console.log(`Server: ${config.server.ip}:${config.server.port}`);
-console.log(`Version: ${config.server.version}`);
-console.log(`Auto-Reconnect: ${config.utils['auto-reconnect'] ? 'Enabled' : 'Disabled'}`);
-console.log('='.repeat(50));
+addlog('='.repeat(50));
+addlog('  Minecraft AFK Bot v2.5 - Bug-Fixed Edition');
+addlog('='.repeat(50));
+addlog(`Server: ${config.server.ip}:${config.server.port}`);
+addlog(`Version: ${config.server.version}`);
+addlog(`Auto-Reconnect: ${config.utils['auto-reconnect'] ? 'Enabled' : 'Disabled'}`);
+addlog('='.repeat(50));
 
 createBot();
