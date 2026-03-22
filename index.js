@@ -347,35 +347,29 @@ app.get('/logs', (req, res) => {
   const logs = getLogs();
 
   res.send(`
-    <html>
-      <head>
-        <title>Bot Logs</title>
-        <meta http-equiv="refresh" content="2">
-        <style>
-          body {
-            background: #0f172a;
-            color: white;
-            font-family: Arial;
-            padding: 20px;
-          }
-          .log {
-            font-family: monospace;
-            margin-bottom: 5px;
-          }
-          a {
-            color: #3b82f6;
-          }
-        </style>
-      </head>
-      <body>
-        <h2>📜 Bot Logs</h2>
-        <a href="/">⬅ Back</a>
-        <hr>
-        ${logs.map(l => `<div class="log">${l}</div>`).join("")}
-      </body>
-    </html>
-  `);
-});
+<html>
+  <head>
+    <title>${config.name} - Setup Guide</title>
+    <meta http-equiv="refresh" content="2">
+    <style>
+      body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #cbd5e1; padding: 40px; max-width: 800px; margin: 0 auto; line-height: 1.6; }
+      h1, h2 { color: #2dd4bf; }
+      h1 { border-bottom: 2px solid #334155; padding-bottom: 10px; }
+      .card { background: #1e293b; padding: 25px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #334155; }
+      a { color: #38bdf8; text-decoration: none; }
+      code { background: #334155; padding: 2px 6px; border-radius: 4px; color: #e2e8f0; font-family: monospace; }
+      .btn-home { display: inline-block; margin-bottom: 20px; padding: 8px 16px; background: #334155; color: white; border-radius: 6px; text-decoration: none; }
+    </style>
+  </head>
+
+  <body>
+    <h2>📜 Bot Logs</h2>
+    <a href="/" class="btn-home">Back to Dashboard</a>
+    <hr>
+    ${logs.map(l => `<div class="log">${l}</div>`).join("")}
+  </body>
+</html>
+`);
 
 
 
