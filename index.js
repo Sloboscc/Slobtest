@@ -169,6 +169,30 @@ app.get('/', (req, res) => {
             filter: brightness(1.1);
           }
 
+           .log {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            background: var(--accent);
+            color: #0f172a;
+            padding: 1rem 2rem;
+            border-radius: 1rem;
+            font-weight: 700;
+            text-decoration: none;
+            margin-top: 1.5rem;
+            transition: all 0.2s;
+            box-shadow: 0 0 20px rgba(45, 212, 191, 0.4);
+            width: 100%;
+            box-sizing: border-box;
+          }
+
+          .log:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 30px rgba(45, 212, 191, 0.6);
+            filter: brightness(1.1);
+          }
+
           .footer {
             margin-top: 1.5rem;
             font-size: 0.8125rem;
@@ -206,7 +230,7 @@ app.get('/', (req, res) => {
           </div>
 
           <a href="/tutorial" class="btn">📘 View Setup Guide</a>
-          <a href="/logs">📜 View Logs</a>
+          <a href="/logs" class="log">📜 View Logs</a>
           
           <div class="footer">Auto-refreshing every 5s</div>
         </div>
