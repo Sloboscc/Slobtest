@@ -231,6 +231,8 @@ app.get('/', (req, res) => {
 
           <a href="/tutorial" class="btn">📘 View Setup Guide</a>
           <a href="/logs" class="log">📜 View Logs</a>
+          <button onclick="startBot()" class="btn">🟢 Start</button>
+          <button onclick="stopBot()" class="btn">🔴 Stop</button>
           
           <div class="footer">Auto-refreshing every 5s</div>
         </div>
@@ -378,7 +380,37 @@ app.get('/logs', (req, res) => {
 `);
 });
 
+let botRunning = true;
 
+app.post('/start', (req, res) => {
+  if (botRunning) return res.json({ success: false, msg: 'Already running' });
+
+  botRunning = true;
+  createBot();
+  addLog('[Control] Bot started');
+
+  res.json({ success: true });
+});
+
+app.post('/stop', (req, res) => {
+  if (!botRunning) return res.json({ success: false, msg: 'Already stopped' });
+
+  botRunning = false;
+
+  if (bot) {
+    bot.end();
+    bot = null;
+  }
+
+  clearAllIntervals();
+  addLog('[Control] Bot stopped');
+
+  res.json({ success: true });
+});
+
+// ============================================================
+//                    END OF WEB TOOLS
+//============================================================
 
 // FIX: handle port conflict gracefully - try next port if taken
 const server = app.listen(PORT, '0.0.0.0', () => {
